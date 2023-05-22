@@ -89,6 +89,26 @@ def resolution(n):
 
     return model.u, model.v, model.w
 
+def algo_verification(u,v,w,n):
+    for test in range(10):
+        a=np.random.randint(-10,10,(n,n))
+        b=np.random.randint(-10,10,(n,n))
+        ab=np.dot(a,b)
+        a_line=[]
+        b_line=[]
+        ab_line=[]
+        for i in range(n):
+            for j in range(n):
+                a_line.append(a[i,j])
+                b_line.append(b[i,j])
+                ab_line.append(ab[i,j])
+        for indice in range(n):
+            if ab_line[indice] != sum(w[indice+1,k]() * sum(u[i+1,k]() * a_line[i] for i in range(n**2)) * sum(v[i+1,k]() * b_line[i] for i in range(n**2)) for k in range(1,n**3+1)):
+                return False
+    return True
+
+
+
 n=2
 u,v,w=resolution(n)
 for i in range(1,5):
@@ -100,3 +120,9 @@ print("\n")
 for i in range(1,5):
     print([int(w[i,m]()) for m in range(1,9)])
 print("\n")
+
+
+if algo_verification(u,v,w,n):
+    print("Functional")
+else:
+    print("Error, not functional")
