@@ -50,11 +50,11 @@ def resolution(n,k):
     
     #we want to reduce the number of additions for a given K ==> reduce non-zero terms
     #absolute value for -1, 0, 1 : can be cell squared
-    #1-norm for binary
+    # 1-norm for binary
     #model.obj = Objective(expr=sum(sum(model.u[i,m] for m in model.M) for i in model.I) + sum(sum(model.v[i,m] for m in model.M) for i in model.I) + sum(sum(model.w[i,m] for m in model.M) for i in model.I))
-    #1-norm for -1,0,1. n=2,k=8 : incumbent found in 24 seconds, lb=30 additions
+    # 1-norm for -1,0,1. n=2,k=8 : incumbent found in 24 seconds, lb=30 additions
     #model.obj = Objective(expr=sum(sum(model.u[i,m]*model.u[i,m] for m in model.M) for i in model.I) + sum(sum(model.v[i,m]*model.v[i,m] for m in model.M) for i in model.I) + sum(sum(model.w[i,m]*model.w[i,m] for m in model.M) for i in model.I))
-    #test : objective to reduce the number of multiplication. n=2,k=8 : incumbent found in 7 seconds
+    # test : objective to reduce the number of multiplication. n=2,k=8 : incumbent found in 7 seconds
     model.obj = Objective(expr=sum(k*model.m[k] for k in model.M))
 
 
@@ -87,7 +87,7 @@ def resolution(n,k):
 
     # Solve the model
     #sol = SolverFactory('gurobi').solve(model, tee=True)
-    sol = SolverFactory('gurobi').solve(model, tee=True, options={"NonConvex":2,"TimeLimit":1*60})
+    sol = SolverFactory('gurobi').solve(model, tee=True, options={"NonConvex":2,"TimeLimit":15*60})
     #the solver found a feasible solution if there is an "incumbent" value
 
     return model.u, model.v, model.w
@@ -113,8 +113,8 @@ def algo_verification(u,v,w,n):
 
 
 
-n=2
-k=n**3-1
+n=3
+k=n**3
 u,v,w=resolution(n,k)
 I=RangeSet(1,n**2)
 M=RangeSet(1,k)
