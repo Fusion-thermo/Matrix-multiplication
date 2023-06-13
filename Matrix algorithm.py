@@ -2,17 +2,7 @@ import numpy as np
 from pyomo.environ import ConcreteModel, Var, Objective, SolverFactory, ConstraintList, RangeSet, Constraint
 from pyomo.environ import PositiveIntegers,Binary, Integers, NonNegativeIntegers
 
-# a=np.array([[0,2],
-#             [1,1]])
-
-# b=np.array([[-5,2],
-#             [1,6]])
-
-# c=np.dot(a,b)
-# print(c)
-
-
-def basic_multiplication_alogrithm(n):
+def basic_multiplication_algorithm(n):
     a=np.zeros((n,n))
     c=np.zeros((n**2,n**2,n**2))
     indice=0
@@ -23,6 +13,7 @@ def basic_multiplication_alogrithm(n):
     b=np.copy(a)
     #the first dimension of c is the number of the cell : 1,2,...n**2
     #pyomo : line, column, 3D ; numpy : 3D, line, column
+    #here : dimension is indice of c, lines and columns are a and b, 1 means the product ab is used to compute c
     for i in range(n):
         for j in range(n):
             for k in range(n):
@@ -32,30 +23,31 @@ def basic_multiplication_alogrithm(n):
     return c
 
 
-#c=basic_multiplication_alogrithm(2)
-#print(c)
+#print(basic_multiplication_algorithm(2))
 
 def resolution(n,k):
 
     model = ConcreteModel()
 
-    model.I=RangeSet(1,n**2)
-    model.M=RangeSet(1,k)
-    model.u=Var(model.I, model.M,within={-1,0,1})
-    model.v=Var(model.I, model.M,within={-1,0,1})
-    model.w=Var(model.I, model.M,within={-1,0,1})
-    model.ab=Var(model.I,model.I,model.M,within={-1,0,1})
-    model.m=Var(model.M,within=NonNegativeIntegers)
-    c=basic_multiplication_alogrithm(n)
+    model.I =RangeSet(1,n**2)
+    model.M = RangeSet(1,k)
+    model.u = Var(model.I, model.M,within={-1,0,1})
+    model.v = Var(model.I, model.M,within={-1,0,1})
+    model.w = Var(model.I, model.M,within={-1,0,1})
+    model.ab = Var(model.I,model.I,model.M,within={-1,0,1})
+    model.m = Var(model.M,within=NonNegativeIntegers)
+    c=basic_multiplication_algorithm(n)
     
     #we want to reduce the number of additions for a given K ==> reduce non-zero terms
     #absolute value for -1, 0, 1 : can be cell squared
     # 1-norm for binary
     #model.obj = Objective(expr=sum(sum(model.u[i,m] for m in model.M) for i in model.I) + sum(sum(model.v[i,m] for m in model.M) for i in model.I) + sum(sum(model.w[i,m] for m in model.M) for i in model.I))
     # 1-norm for -1,0,1. n=2,k=8 : incumbent found in 24 seconds, lb=30 additions
-    #model.obj = Objective(expr=sum(sum(model.u[i,m]*model.u[i,m] for m in model.M) for i in model.I) + sum(sum(model.v[i,m]*model.v[i,m] for m in model.M) for i in model.I) + sum(sum(model.w[i,m]*model.w[i,m] for m in model.M) for i in model.I))
-    # test : objective to reduce the number of multiplication. n=2,k=8 : incumbent found in 7 seconds
-    model.obj = Objective(expr=sum(k*model.m[k] for k in model.M))
+    model.obj = Objective(expr=sum(sum(model.u[i,m]*model.u[i,m] for m in model.M) for i in model.I) + sum(sum(model.v[i,m]*model.v[i,m] for m in model.M) for i in model.I) + sum(sum(model.w[i,m]*model.w[i,m] for m in model.M) for i in model.I))
+    # no objective, we just want the constraints satisfied : doesn't work
+    #model.obj = Objective(expr=model.u[1,1])
+    # objective to reduce the number of multiplication. n=2,k=8 : incumbent found in 7 seconds
+    #model.obj = Objective(expr=sum(k*model.m[k] for k in model.M))
 
 
     #new formula must be equivalent to the basic formula with n**3 multiplication
@@ -66,7 +58,9 @@ def resolution(n,k):
     for h in model.I:
         for i in model.I:
             for j in model.I:
+                #non quadratic form :
                 #model.sum.add(expr=sum(model.w[h,k] * model.u[i,k] * model.v[j,k] for k in model.M) == c[h-1,i-1,j-1]) #body with non linear terms
+                #quadratic form :
                 model.sum.add(expr=sum(model.w[h,k] * model.ab[i,j,k] for k in model.M) == c[h-1,i-1,j-1])
 
     #in order to reduce the above constraint in a quadratic form, we store here the multiplication of each aibj for each k
@@ -80,14 +74,17 @@ def resolution(n,k):
     #this represents the number of multiplication : each non zero cell counts for one multiplication
     model.multipl=ConstraintList()
     for k in model.M:
+        #goal : not utilizing a M if the column of w is 0 for this M, better results than the next one : finds first incumbent in 17s
         model.multipl.add(expr=model.m[k] == sum(model.w[i,k]*model.w[i,k] for i in model.I))
+        #goal : a M has value 0, for n=2, finds first incumbent in 56s
+        #model.multipl.add(expr=model.m[k] == sum(model.u[i,k]*model.u[i,k] for i in model.I))
 
     # Write the LP model in standard format
     #model.write("matrix_{}.lp".format(n))
 
     # Solve the model
     #sol = SolverFactory('gurobi').solve(model, tee=True)
-    sol = SolverFactory('gurobi').solve(model, tee=True, options={"NonConvex":2,"TimeLimit":15*60})
+    sol = SolverFactory('gurobi').solve(model, tee=True, options={"NonConvex":2,"TimeLimit":1*60})
     #the solver found a feasible solution if there is an "incumbent" value
 
     return model.u, model.v, model.w
@@ -113,7 +110,7 @@ def algo_verification(u,v,w,n):
 
 
 
-n=3
+n=2
 k=n**3
 u,v,w=resolution(n,k)
 I=RangeSet(1,n**2)
